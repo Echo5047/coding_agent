@@ -13,8 +13,11 @@ def is_valid(board, row, col):
     返回:
     bool: 如果合法返回 True，否则返回 False
     """
-    # TODO
-    pass
+    for prev_row in range(row):
+        prev_col = board[prev_row]
+        if prev_col == col or abs(prev_col - col) == abs(prev_row - row):
+            return False
+    return True
 
 
 def backtrack(board, row, n, solutions):
@@ -27,8 +30,15 @@ def backtrack(board, row, n, solutions):
     n: int，棋盘大小（N）
     solutions: list，用于保存所有找到的合法解
     """
-    # TODO
-    pass
+    if row == n:
+        solutions.append(board.copy())
+        return
+
+    for col in range(n):
+        if is_valid(board, row, col):
+            board[row] = col
+            backtrack(board, row + 1, n, solutions)
+            board[row] = -1
 
 if __name__ == "__main__":
     N = 8
