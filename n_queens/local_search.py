@@ -16,7 +16,14 @@ def get_conflicts(board, row, col, n):
     int: 冲突的数量
     """
     conflicts = 0
-    # TODO
+    for other_row in range(n):
+        if other_row == row:
+            continue
+
+        other_col = board[other_row]
+        if other_col == col or abs(other_col - col) == abs(other_row - row):
+            conflicts += 1
+
     return conflicts
 
 def min_conflicts(n, max_steps=1000):
@@ -30,20 +37,35 @@ def min_conflicts(n, max_steps=1000):
     返回:
     list 或 None: 如果找到解则返回 board 状态，否则返回 None
     """
-    # 随机初始化棋盘，每行随机分配一个列号
-    board = [random.randint(0, n - 1) for _ in range(n)]
-    
-    for step in range(max_steps):
-        # 找出当前棋盘上所有存在冲突的行
-        conflicted_rows = []
-        for r in range(n):
-            if get_conflicts(board, r, board[r], n) > 0:
-                conflicted_rows.append(r)
-                
-        # TODO
-        pass
-        
-    return None 
+    if n <= 0:
+        return []
+
+    steps_used = 0
+    restart_interval = max(10, n * 10)
+
+    while steps_used < max_steps:
+        # 随机初始化棋盘，每行随机分配一个列号；如果陷入局部最优，后续会重启。
+        board = [random.randint(0, n - 1) for _ in range(n)]
+
+        for _ in range(min(restart_interval, max_steps - steps_used)):
+            steps_used += 1
+
+            # 找出当前棋盘上所有存在冲突的行
+            conflicted_rows = []
+            for r in range(n):
+                if get_conflicts(board, r, board[r], n) > 0:
+                    conflicted_rows.append(r)
+
+            if not conflicted_rows:
+                return board
+
+            row = random.choice(conflicted_rows)
+            conflict_counts = [get_conflicts(board, row, col, n) for col in range(n)]
+            min_conflict = min(conflict_counts)
+            best_cols = [col for col, count in enumerate(conflict_counts) if count == min_conflict]
+            board[row] = random.choice(best_cols)
+
+    return None
 
 if __name__ == "__main__":
     N = 8

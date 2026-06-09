@@ -236,25 +236,33 @@ def get_full_system_prompt() -> str:
 
 def extract_tool_invocations(text: str) -> List[Tuple[str, Dict[str, Any]]]:
     """
-    Parse lines like: tool: read_file({"filename": "n_queens/backtracking.py"})
+    Parse tool calls like: tool: read_file({"filename": "n_queens/backtracking.py"})
+
+    The system prompt asks the model to emit exactly one tool call per line, but
+    some models occasionally concatenate calls without a newline.  Splitting on
+    every ``tool:`` marker makes the parser tolerant of both forms.
     """
     invocations = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line.startswith("tool:"):
+    chunks = text.split("tool:")
+    for chunk in chunks[1:]:
+        tool_text = chunk.strip()
+        if not tool_text:
             continue
 
         try:
-            # TODO 1: split the line into tool name and JSON argument string.
-            # Hint:
-            # after_tool = line[len("tool:"):].strip()
-            # name, rest = after_tool.split("(", 1)
-            # args = json.loads(rest[:-1].strip())
-            name = ""
-            args = {}
-
+            name, rest = tool_text.split("(", 1)
+            name = name.strip()
             if not name:
                 continue
+
+            decoder = json.JSONDecoder()
+            args_text = rest.lstrip()
+            args, end_idx = decoder.raw_decode(args_text)
+            if not isinstance(args, dict):
+                continue
+            if not args_text[end_idx:].lstrip().startswith(")"):
+                continue
+
             invocations.append((name, args))
         except Exception:
             continue
@@ -278,10 +286,18 @@ def execute_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         if name == "list_files":
             return TOOL_REGISTRY[name](args.get("path", "."))
 
-        # TODO 2: dispatch edit_file and run_bash.
-        # Hint:
-        # edit_file needs path, old_str, new_str.
-        # run_bash needs command, cwd, timeout_seconds.
+        if name == "edit_file":
+            return TOOL_REGISTRY[name](
+                args.get("path", ""),
+                args.get("old_str", ""),
+                args.get("new_str", ""),
+            )
+        if name == "run_bash":
+            return TOOL_REGISTRY[name](
+                args.get("command", ""),
+                args.get("cwd", "n_queens"),
+                args.get("timeout_seconds", 10),
+            )
 
     except Exception as exc:
         return {
@@ -319,14 +335,13 @@ def run_agent(task: str = DEFAULT_TASK, max_turns: int = 30) -> None:
     client = make_deepseek_client()
     conversation = [
         {"role": "system", "content": get_full_system_prompt()},
-        # TODO 3: add {"role": "user", "content": task.strip()}
+        {"role": "user", "content": task.strip()},
     ]
 
     print(f"{YOU_COLOR}Task:{RESET_COLOR} {task.strip()}\n")
 
     for turn in range(max_turns):
-        # TODO 4: call execute_deepseek_call(client, conversation)
-        assistant_response = ""
+        assistant_response = execute_deepseek_call(client, conversation)
 
         print(f"{ASSISTANT_COLOR}Assistant:{RESET_COLOR} {assistant_response}")
         conversation.append({"role": "assistant", "content": assistant_response})
@@ -341,7 +356,7 @@ def run_agent(task: str = DEFAULT_TASK, max_turns: int = 30) -> None:
             result_text = json.dumps(tool_result, ensure_ascii=False)
             print(f"{TOOL_COLOR}Result:{RESET_COLOR} {result_text}\n")
 
-            # TODO 5: append a user message containing f"tool_result({result_text})"
+            conversation.append({"role": "user", "content": f"tool_result({result_text})"})
 
     print(f"{ASSISTANT_COLOR}Assistant:{RESET_COLOR} Reached max_turns={max_turns}.")
 
