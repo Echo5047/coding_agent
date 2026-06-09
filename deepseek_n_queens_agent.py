@@ -243,8 +243,8 @@ def extract_tool_invocations(text: str) -> List[Tuple[str, Dict[str, Any]]]:
     every ``tool:`` marker makes the parser tolerant of both forms.
     """
     invocations = []
-    chunks = text.split("tool:")
-    for chunk in chunks[1:]:
+    decoder = json.JSONDecoder()
+    for chunk in text.split("tool:")[1:]:
         tool_text = chunk.strip()
         if not tool_text:
             continue
@@ -255,7 +255,6 @@ def extract_tool_invocations(text: str) -> List[Tuple[str, Dict[str, Any]]]:
             if not name:
                 continue
 
-            decoder = json.JSONDecoder()
             args_text = rest.lstrip()
             args, end_idx = decoder.raw_decode(args_text)
             if not isinstance(args, dict):
