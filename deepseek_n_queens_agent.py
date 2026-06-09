@@ -250,16 +250,15 @@ def extract_tool_invocations(text: str) -> List[Tuple[str, Dict[str, Any]]]:
             continue
 
         try:
-            name, rest = tool_text.split("(", 1)
+            after_tool = line[len("tool:"):].strip()
+            name, rest = after_tool.split("(", 1)
             name = name.strip()
-            if not name:
+            rest = rest.strip()
+            if not name or not rest.endswith(")"):
                 continue
 
-            args_text = rest.lstrip()
-            args, end_idx = decoder.raw_decode(args_text)
+            args = json.loads(rest[:-1].strip())
             if not isinstance(args, dict):
-                continue
-            if not args_text[end_idx:].lstrip().startswith(")"):
                 continue
 
             invocations.append((name, args))
