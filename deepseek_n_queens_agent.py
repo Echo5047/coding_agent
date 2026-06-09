@@ -236,12 +236,17 @@ def get_full_system_prompt() -> str:
 
 def extract_tool_invocations(text: str) -> List[Tuple[str, Dict[str, Any]]]:
     """
-    Parse lines like: tool: read_file({"filename": "n_queens/backtracking.py"})
+    Parse tool calls like: tool: read_file({"filename": "n_queens/backtracking.py"})
+
+    The system prompt asks the model to emit exactly one tool call per line, but
+    some models occasionally concatenate calls without a newline.  Splitting on
+    every ``tool:`` marker makes the parser tolerant of both forms.
     """
     invocations = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line.startswith("tool:"):
+    decoder = json.JSONDecoder()
+    for chunk in text.split("tool:")[1:]:
+        tool_text = chunk.strip()
+        if not tool_text:
             continue
 
         try:
